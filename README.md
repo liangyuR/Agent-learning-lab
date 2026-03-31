@@ -251,8 +251,3 @@ python src/main.py --file samples/meeting_notes.txt
 
 仅用于学习与实验。
 
-```
-
-如果你愿意，我可以下一条继续帮你把这份 README 按你当前真实代码再精确对齐一次，比如补上 `--file` 参数的具体实现说明和退出码。
-```
-
