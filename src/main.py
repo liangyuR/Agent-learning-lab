@@ -18,7 +18,7 @@ from tool_registery import build_default_registry
 from tool_runner import run_tool_invocation
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro"
+DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash"
 DEFAULT_DEEPSEEK_REASONING_EFFORT = "high"
 
 

@@ -4,6 +4,7 @@ from tools.base_tool import BaseTool
 from tools.get_datatime import GetCurrentTimeTool
 from tools.read_markdown_file import ReadMarkdownFileTool
 from tools.query_db import QueryDbTool
+from tools.http_tool import HttpRequestTool
 
 from models import ToolCallRequest
 
@@ -34,4 +35,5 @@ def build_default_registry() -> ToolRegistry:
     registry.register(GetCurrentTimeTool())
     registry.register(ReadMarkdownFileTool())
     registry.register(QueryDbTool())
+    registry.register(HttpRequestTool())
     return registry

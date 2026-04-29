@@ -12,6 +12,7 @@ from models import ToolCallInvocation  # noqa: E402
 from tool_registery import ToolRegistry, build_default_registry  # noqa: E402
 from tool_runner import run_tool_invocation  # noqa: E402
 from tools.get_datatime import GetCurrentTimeTool  # noqa: E402
+from tools.http_tool import HttpRequestTool  # noqa: E402
 
 
 class TestBaseToolDefinition(unittest.TestCase):
@@ -27,6 +28,11 @@ class TestBuildDefaultRegistry(unittest.TestCase):
         r = build_default_registry()
         t = r.get("get_current_time")
         self.assertIsInstance(t, GetCurrentTimeTool)
+
+    def test_has_http_request(self) -> None:
+        r = build_default_registry()
+        t = r.get("http_request")
+        self.assertIsInstance(t, HttpRequestTool)
 
     def test_definitions_non_empty(self) -> None:
         r = build_default_registry()
