@@ -30,6 +30,14 @@ class TestParseArgs(unittest.TestCase):
         self.assertIsNone(ns.input)
         self.assertIsNone(ns.file)
 
+    def test_mode_defaults_to_analysis(self) -> None:
+        ns = parse_args([])
+        self.assertEqual(ns.mode, "analysis")
+
+    def test_mode_agent(self) -> None:
+        ns = parse_args(["--mode", "agent"])
+        self.assertEqual(ns.mode, "agent")
+
     def test_file_long_flag(self) -> None:
         ns = parse_args(["--file", "input.txt"])
         self.assertEqual(ns.file, "input.txt")
