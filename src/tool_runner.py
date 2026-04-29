@@ -32,5 +32,8 @@ def run_tool_invocation(
             except Exception as e:
                 result = ToolResult(ok=False, tool_name=inv.name, error=str(e))
 
-    logger.debug(f"[TOOL RESULT] ok={result.ok}")
+    if result.ok:
+        logger.debug("[TOOL RESULT] ok=True")
+    else:
+        logger.debug(f"[TOOL RESULT] ok=False error={result.error}")
     return result

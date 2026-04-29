@@ -120,14 +120,13 @@ class TestReadTextFile(unittest.TestCase):
 
     def test_directory_path_raises(self) -> None:
         # Unix 常见 IsADirectoryError；Windows 上多为 PermissionError
-        with tempfile.TemporaryDirectory() as d:
-            with self.assertRaises((IsADirectoryError, PermissionError)):
-                read_text_file(d)
+        with self.assertRaises((IsADirectoryError, PermissionError)):
+            read_text_file(str(_SRC))
 
 
 class TestMainFileBranch(unittest.TestCase):
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
-    @patch("main.genai.Client")
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch("main.build_deepseek_client")
     @patch("main.call_model")
     @patch(
         "main.parse_output",
@@ -142,7 +141,7 @@ class TestMainFileBranch(unittest.TestCase):
         self,
         _parse_output: MagicMock,
         mock_call_model: MagicMock,
-        _client: MagicMock,
+        _build_client: MagicMock,
     ) -> None:
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", delete=False
@@ -157,15 +156,15 @@ class TestMainFileBranch(unittest.TestCase):
         finally:
             Path(p).unlink(missing_ok=True)
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
-    @patch("main.genai.Client")
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch("main.build_deepseek_client")
     @patch("main.call_model")
     @patch("main.parse_output")
     def test_file_whitespace_only_exits_one_without_calling_model(
         self,
         _parse_output: MagicMock,
         mock_call_model: MagicMock,
-        _client: MagicMock,
+        mock_build_client: MagicMock,
     ) -> None:
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", delete=False
@@ -176,36 +175,38 @@ class TestMainFileBranch(unittest.TestCase):
             with patch.object(sys, "argv", ["main.py", "--file", p]):
                 code = main()
             self.assertEqual(code, 1)
+            mock_build_client.assert_not_called()
             mock_call_model.assert_not_called()
         finally:
             Path(p).unlink(missing_ok=True)
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
-    @patch("main.genai.Client")
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch("main.build_deepseek_client")
     @patch("main.call_model")
     @patch("main.parse_output")
     def test_file_missing_exits_one_without_calling_model(
         self,
         _parse_output: MagicMock,
         mock_call_model: MagicMock,
-        _client: MagicMock,
+        mock_build_client: MagicMock,
     ) -> None:
         with patch.object(
             sys, "argv", ["main.py", "--file", "__no_such_file_for_main__.txt"]
         ):
             code = main()
         self.assertEqual(code, 1)
+        mock_build_client.assert_not_called()
         mock_call_model.assert_not_called()
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=True)
-    @patch("main.genai.Client")
+    @patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}, clear=True)
+    @patch("main.build_deepseek_client")
     @patch("main.call_model")
     @patch("main.parse_output")
     def test_file_invalid_utf8_exits_one_without_calling_model(
         self,
         _parse_output: MagicMock,
         mock_call_model: MagicMock,
-        _client: MagicMock,
+        mock_build_client: MagicMock,
     ) -> None:
         path: str | None = None
         try:
@@ -215,6 +216,7 @@ class TestMainFileBranch(unittest.TestCase):
             with patch.object(sys, "argv", ["main.py", "--file", path]):
                 code = main()
             self.assertEqual(code, 1)
+            mock_build_client.assert_not_called()
             mock_call_model.assert_not_called()
         finally:
             if path:

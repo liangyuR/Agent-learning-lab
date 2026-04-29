@@ -3,12 +3,12 @@ import json
 import os
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from google import genai
-from google.genai import types
 from dotenv import load_dotenv
+import httpx
 from loguru import logger
 from tenacity import Retrying, stop_after_attempt, wait_chain, wait_fixed
 
@@ -16,6 +16,17 @@ from models import ToolCallRequest, ToolResult
 from parser import ParserOutputError, parse_tool_call_response
 from tool_registery import build_default_registry
 from tool_runner import run_tool_invocation
+
+DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash"
+DEFAULT_DEEPSEEK_REASONING_EFFORT = "high"
+
+
+@dataclass(frozen=True)
+class ModelResponse:
+    """统一暴露 text，保持解析层不关心底层模型供应商。"""
+
+    text: str
 
 
 class ParseOutputError(Exception):
@@ -28,7 +39,7 @@ class ParseOutputError(Exception):
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Gemini CLI 文本助手")
+    parser = argparse.ArgumentParser(description="DeepSeek CLI 文本助手")
     source = parser.add_mutually_exclusive_group(required=False)
     source.add_argument(
         "--input",
@@ -122,7 +133,7 @@ def build_agent_followup_after_tool(
     )
 
 
-def run_agent_flow(client: genai.Client, question: str) -> int:
+def run_agent_flow(client: httpx.Client, question: str) -> int:
     """一轮模型可能 tool_call，本地执行后再调一次模型要 final_answer。"""
     registry = build_default_registry()
     system_instruction = build_agent_system_instruction(registry.definitions())
@@ -178,22 +189,86 @@ _MODEL_MAX_ATTEMPTS = 4
 _MODEL_RETRY_WAIT_SEC = (2.0, 4.0, 8.0)
 
 
+def build_deepseek_client(api_key: str) -> httpx.Client:
+    """创建 DeepSeek OpenAI-compatible Chat Completions 客户端。"""
+    base_url = os.getenv("DEEPSEEK_BASE_URL", DEFAULT_DEEPSEEK_BASE_URL).rstrip("/")
+    return httpx.Client(
+        base_url=base_url,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        timeout=60.0,
+    )
+
+
+def build_deepseek_payload(
+    system_instruction: str,
+    user_content: str,
+    max_output_tokens: int,
+) -> dict[str, Any]:
+    """构建 DeepSeek 对话请求体，默认启用官方 thinking 模式。"""
+    model = os.getenv("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL)
+    reasoning_effort = os.getenv(
+        "DEEPSEEK_REASONING_EFFORT",
+        DEFAULT_DEEPSEEK_REASONING_EFFORT,
+    )
+    return {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_content},
+        ],
+        "stream": False,
+        "max_tokens": max_output_tokens,
+        "reasoning_effort": reasoning_effort,
+        "thinking": {"type": "enabled"},
+    }
+
+
+def extract_deepseek_text(data: dict[str, Any]) -> str:
+    """从 DeepSeek Chat Completions 响应中取最终回答 content。"""
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("DeepSeek 响应缺少 choices")
+
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        raise ValueError("DeepSeek 响应 choices[0] 格式异常")
+
+    message = first_choice.get("message")
+    if not isinstance(message, dict):
+        raise ValueError("DeepSeek 响应缺少 message")
+
+    content = message.get("content")
+    if content is None:
+        return ""
+    if not isinstance(content, str):
+        raise ValueError("DeepSeek 响应 content 不是字符串")
+    return content
+
+
 def call_model(
-    client: genai.Client,
+    client: httpx.Client,
     system_instruction: str,
     user_content: str,
     *,
     max_output_tokens: int = 600,
-) -> Any:
-    def do_generate() -> Any:
-        return client.models.generate_content(
-            model="gemini-3.1-flash-lite-preview",
-            contents=user_content,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                max_output_tokens=max_output_tokens,
+) -> ModelResponse:
+    def do_generate() -> ModelResponse:
+        response = client.post(
+            "/chat/completions",
+            json=build_deepseek_payload(
+                system_instruction,
+                user_content,
+                max_output_tokens,
             ),
         )
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict):
+            raise ValueError("DeepSeek 响应不是 JSON 对象")
+        return ModelResponse(text=extract_deepseek_text(data))
 
     def before_sleep(retry_state: Any) -> None:
         exc = retry_state.outcome.exception() if retry_state.outcome else None
@@ -280,14 +355,12 @@ def main() -> int:
     load_dotenv()
     args = parse_args()
 
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    api_key = os.getenv("DEEPSEEK_API_KEY")
     if not api_key:
-        print("错误：未找到 GEMINI_API_KEY 或 GOOGLE_API_KEY", file=sys.stderr)
+        print("错误：未找到 DEEPSEEK_API_KEY", file=sys.stderr)
         return 1
 
     try:
-        client = genai.Client()
-
         if args.file is not None:
             try:
                 question = read_text_file(args.file).strip()
@@ -311,16 +384,20 @@ def main() -> int:
                 print("错误：问题不能为空", file=sys.stderr)
                 return 1
 
-        if args.mode == "agent":
-            return run_agent_flow(client, question)
+        client = build_deepseek_client(api_key)
+        try:
+            if args.mode == "agent":
+                return run_agent_flow(client, question)
 
-        system_instruction = build_system_instruction()
-        user_content = build_user_content(question)
-        response = call_model(client, system_instruction, user_content)
+            system_instruction = build_system_instruction()
+            user_content = build_user_content(question)
+            response = call_model(client, system_instruction, user_content)
 
-        parsed_response = parse_output(response)
-        print(json.dumps(parsed_response, ensure_ascii=False, indent=2))
-        return 0
+            parsed_response = parse_output(response)
+            print(json.dumps(parsed_response, ensure_ascii=False, indent=2))
+            return 0
+        finally:
+            client.close()
 
     except ParseOutputError as e:
         print(f"解析模型输出失败: {e.message}", file=sys.stderr)
@@ -331,7 +408,7 @@ def main() -> int:
         return 3
 
     except Exception as e:
-        print(f"调用 Gemini 失败: {e}", file=sys.stderr)
+        print(f"调用 DeepSeek 失败: {e}", file=sys.stderr)
         return 2
 
 

@@ -5,7 +5,7 @@
 ## 技术栈
 
 - **语言**: Python 3.12+
-- **LLM SDK**: `google-genai` (Gemini)
+- **LLM API**: DeepSeek OpenAI-compatible Chat Completions（通过 `httpx` 调用）
 - **依赖管理**: pip + requirements.txt
 - **环境变量**: python-dotenv，密钥存放于 `.env`（已 gitignore）
 
@@ -16,7 +16,7 @@ src/
   main.py              # 入口 & 核心逻辑
   tests/               # 测试
 requirements.txt
-.env                   # GEMINI_API_KEY（不入库）
+.env                   # DEEPSEEK_API_KEY（不入库）
 ```
 
 ## 编码规范
@@ -41,7 +41,7 @@ requirements.txt
 pip install -r requirements.txt
 
 # 配置密钥
-echo "GEMINI_API_KEY=your-key" > .env
+echo "DEEPSEEK_API_KEY=your-key" > .env
 
 # 运行
 python src/main.py
