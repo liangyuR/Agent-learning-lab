@@ -64,7 +64,7 @@ class TestReadMarkdownFileTool(unittest.TestCase):
         mock_cwd.return_value = _SRC
         t = ReadMarkdownFileTool()
         out = t.run(t.input_model.model_validate({"path": "README.md"}))
-        self.assertIn("Gemini", out["content"] or "")
+        self.assertIn("DeepSeek", out["content"] or "")
 
 
 if __name__ == "__main__":

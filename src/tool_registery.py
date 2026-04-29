@@ -3,6 +3,7 @@ from __future__ import annotations
 from tools.base_tool import BaseTool
 from tools.get_datatime import GetCurrentTimeTool
 from tools.read_markdown_file import ReadMarkdownFileTool
+from tools.query_db import QueryDbTool
 
 from models import ToolCallRequest
 
@@ -32,4 +33,5 @@ def build_default_registry() -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(GetCurrentTimeTool())
     registry.register(ReadMarkdownFileTool())
+    registry.register(QueryDbTool())
     return registry

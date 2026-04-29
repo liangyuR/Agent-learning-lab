@@ -1,0 +1,8 @@
+# 复制为同目录下的 db.yaml 后填写真实连接信息。
+# 密码建议同时用环境变量 MYSQL_PASSWORD，避免明文入库。
+mysql:
+  ip: 127.0.0.1
+  port: 3306
+  username: root
+  password: "change-me"
+  database: your_database

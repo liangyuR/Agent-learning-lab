@@ -1,7 +1,7 @@
-# Gemini CLI 文本助手
+# DeepSeek CLI 文本助手
 
 一个最小可运行的 Python CLI 文本助手。  
-基于 Gemini API，对输入文本进行分析，并输出固定结构的 JSON 结果。
+基于 DeepSeek API，对输入文本进行分析，并输出固定结构的 JSON 结果。
 
 当前支持：
 
@@ -57,8 +57,8 @@ agent-learning-lab/
 
 ## 运行环境
 
-- Python 3.10+
-- Gemini API Key
+- Python 3.12+
+- DeepSeek API Key
 
 ---
 
@@ -85,7 +85,7 @@ pip install -r requirements.txt
 如果你还没有 `requirements.txt`，可以先写成：
 
 ```txt
-google-genai
+httpx
 python-dotenv
 loguru
 tenacity
@@ -98,19 +98,18 @@ tenacity
 在项目根目录创建 `.env` 文件：
 
 ```env
-GEMINI_API_KEY=your_gemini_api_key
+DEEPSEEK_API_KEY=your_deepseek_api_key
 ```
 
-也可以使用：
+可选配置：
 
 ```env
-GOOGLE_API_KEY=your_gemini_api_key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-pro
+DEEPSEEK_REASONING_EFFORT=high
 ```
 
-程序会优先读取：
-
-- `GEMINI_API_KEY`
-- `GOOGLE_API_KEY`
+程序会读取 `DEEPSEEK_API_KEY`。默认使用 DeepSeek thinking 模式。
 
 ---
 
