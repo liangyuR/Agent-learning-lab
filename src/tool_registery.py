@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tools.base_tool import BaseTool
 from tools.get_datatime import GetCurrentTimeTool
+from tools.read_markdown_file import ReadMarkdownFileTool
 
 from models import ToolCallRequest
 
@@ -30,4 +31,5 @@ def build_default_registry() -> ToolRegistry:
     """项目默认注册表：在此集中注册所有内置工具。"""
     registry = ToolRegistry()
     registry.register(GetCurrentTimeTool())
+    registry.register(ReadMarkdownFileTool())
     return registry
