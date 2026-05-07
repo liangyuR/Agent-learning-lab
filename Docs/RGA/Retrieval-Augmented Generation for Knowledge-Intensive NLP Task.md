@@ -1,0 +1,1 @@
+[Retrieval-Augmented Generation for Knowledge-Intensive NLP Task](https://arxiv.org/pdf/2005.11401)
