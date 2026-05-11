@@ -40,6 +40,16 @@ class TestBuildDefaultRegistry(unittest.TestCase):
         self.assertTrue(len(defs) >= 1)
         self.assertEqual(defs[0].name, "get_current_time")
 
+    def test_api_tools_shape(self) -> None:
+        r = build_default_registry()
+        tools = r.api_tools()
+        self.assertTrue(len(tools) >= 1)
+        first = tools[0]
+        self.assertEqual(first["type"], "function")
+        self.assertEqual(first["function"]["name"], "get_current_time")
+        self.assertIn("parameters", first["function"])
+        self.assertNotIn("strict", first["function"])
+
 
 class TestRunToolInvocation(unittest.TestCase):
     def test_ok(self) -> None:

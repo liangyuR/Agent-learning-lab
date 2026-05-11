@@ -1,4 +1,4 @@
-"""测试 call_model 在失败时的重试行为。"""
+"""测试 call_model / call_chat_model 单次请求行为（失败不重试）。"""
 
 import sys
 import unittest
@@ -9,7 +9,13 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from main import call_model  # noqa: E402
+from main import (  # noqa: E402
+    DEFAULT_DEEPSEEK_MODEL,
+    build_deepseek_chat_payload,
+    call_chat_model,
+    call_model,
+    extract_deepseek_model_response,
+)
 
 
 def make_deepseek_response(content: str) -> MagicMock:
@@ -26,28 +32,46 @@ def make_deepseek_response(content: str) -> MagicMock:
     return response
 
 
-class TestCallModelRetry(unittest.TestCase):
-    @patch("time.sleep", MagicMock())
-    def test_three_failures_then_success(self) -> None:
+def make_deepseek_tool_call_response() -> MagicMock:
+    response = MagicMock()
+    response.json.return_value = {
+        "choices": [
+            {
+                "finish_reason": "tool_calls",
+                "message": {
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "get_current_time",
+                                "arguments": '{"timezone":"UTC"}',
+                            },
+                        }
+                    ],
+                },
+            },
+        ],
+    }
+    return response
+
+
+class TestCallModelSingleAttempt(unittest.TestCase):
+    def test_success_on_first_post(self) -> None:
         client = MagicMock()
-        client.post.side_effect = [
-            RuntimeError("e1"),
-            RuntimeError("e2"),
-            RuntimeError("e3"),
-            make_deepseek_response("ok"),
-        ]
+        client.post.return_value = make_deepseek_response("ok")
         result = call_model(client, "system", "user")
         self.assertEqual(result.text, "ok")
-        self.assertEqual(client.post.call_count, 4)
+        self.assertEqual(client.post.call_count, 1)
 
-    @patch("time.sleep", MagicMock())
-    def test_all_attempts_fail_raises_last_error(self) -> None:
+    def test_raises_on_first_post_error_no_retry(self) -> None:
         client = MagicMock()
-        client.post.side_effect = RuntimeError("always fail")
+        client.post.side_effect = RuntimeError("network down")
         with self.assertRaises(RuntimeError) as ctx:
             call_model(client, "system", "user")
-        self.assertEqual(str(ctx.exception), "always fail")
-        self.assertEqual(client.post.call_count, 4)
+        self.assertEqual(str(ctx.exception), "network down")
+        self.assertEqual(client.post.call_count, 1)
 
     @patch.dict("os.environ", {}, clear=True)
     def test_payload_uses_deepseek_thinking_mode(self) -> None:
@@ -55,7 +79,7 @@ class TestCallModelRetry(unittest.TestCase):
         client.post.return_value = make_deepseek_response("ok")
         call_model(client, "system", "user", max_output_tokens=123)
         payload = client.post.call_args.kwargs["json"]
-        self.assertEqual(payload["model"], "deepseek-v4-pro")
+        self.assertEqual(payload["model"], DEFAULT_DEEPSEEK_MODEL)
         self.assertEqual(payload["max_tokens"], 123)
         self.assertEqual(payload["reasoning_effort"], "high")
         self.assertEqual(payload["thinking"], {"type": "enabled"})
@@ -66,6 +90,73 @@ class TestCallModelRetry(unittest.TestCase):
                 {"role": "user", "content": "user"},
             ],
         )
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_call_chat_model_sends_full_messages(self) -> None:
+        client = MagicMock()
+        client.post.return_value = make_deepseek_response("hi")
+        msgs = [
+            {"role": "system", "content": "s"},
+            {"role": "user", "content": "u1"},
+            {"role": "assistant", "content": "a1"},
+            {"role": "user", "content": "u2"},
+        ]
+        result = call_chat_model(client, msgs, max_output_tokens=99)
+        self.assertEqual(result.text, "hi")
+        self.assertEqual(result.content, "hi")
+        payload = client.post.call_args.kwargs["json"]
+        self.assertEqual(payload["messages"], msgs)
+        self.assertEqual(payload["max_tokens"], 99)
+        self.assertEqual(payload["model"], DEFAULT_DEEPSEEK_MODEL)
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_call_chat_model_sends_tools_and_tool_choice(self) -> None:
+        client = MagicMock()
+        client.post.return_value = make_deepseek_response("ok")
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_current_time",
+                    "description": "获取当前时间",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        ]
+        call_chat_model(
+            client,
+            [{"role": "user", "content": "现在几点？"}],
+            tools=tools,
+            tool_choice="auto",
+            max_output_tokens=88,
+        )
+        payload = client.post.call_args.kwargs["json"]
+        self.assertEqual(payload["tools"], tools)
+        self.assertEqual(payload["tool_choice"], "auto")
+        self.assertEqual(payload["max_tokens"], 88)
+
+    def test_extract_deepseek_model_response_reads_tool_calls(self) -> None:
+        data = make_deepseek_tool_call_response().json()
+        result = extract_deepseek_model_response(data)
+        self.assertEqual(result.finish_reason, "tool_calls")
+        self.assertEqual(result.content, "")
+        self.assertEqual(len(result.tool_calls), 1)
+        self.assertEqual(result.tool_calls[0].id, "call_1")
+        self.assertEqual(result.tool_calls[0].name, "get_current_time")
+        self.assertEqual(result.tool_calls[0].arguments["timezone"], "UTC")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_build_deepseek_chat_payload_matches_call_shape(self) -> None:
+        payload = build_deepseek_chat_payload(
+            [{"role": "user", "content": "x"}],
+            50,
+            response_format={"type": "json_object"},
+        )
+        self.assertIn("model", payload)
+        self.assertEqual(payload["messages"], [{"role": "user", "content": "x"}])
+        self.assertEqual(payload["max_tokens"], 50)
+        self.assertEqual(payload["response_format"], {"type": "json_object"})
+        self.assertFalse(payload["stream"])
 
 
 if __name__ == "__main__":

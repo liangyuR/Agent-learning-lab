@@ -90,6 +90,20 @@ class ToolCallInvocation(BaseModel):
         return v.strip()
 
 
+class NativeToolCall(BaseModel):
+    """DeepSeek/OpenAI 原生 tool_calls 中的单个 function 调用。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(..., min_length=1, description="API 返回的 tool_call_id")
+    name: str = Field(..., min_length=1, description="工具名称")
+    arguments: dict[str, Any] = Field(default_factory=dict, description="工具参数")
+
+    def to_invocation(self) -> ToolCallInvocation:
+        """转为项目内部已有的 ToolCallInvocation。"""
+        return ToolCallInvocation(name=self.name, arguments=self.arguments)
+
+
 class ToolCallResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

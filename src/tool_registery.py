@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from tools.base_tool import BaseTool
 from tools.get_datatime import GetCurrentTimeTool
 from tools.read_markdown_file import ReadMarkdownFileTool
@@ -27,6 +29,25 @@ class ToolRegistry:
     def definitions(self) -> list[ToolCallRequest]:
         """供写入 system prompt 的工具列表（OpenAI function 形状）。"""
         return [t.to_definition() for t in self.list_tools()]
+
+    def api_tools(self) -> list[dict[str, Any]]:
+        """DeepSeek/OpenAI Chat Completions 原生 tools 参数格式。"""
+        tools: list[dict[str, Any]] = []
+        for definition in self.definitions():
+            tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": definition.name,
+                        "description": definition.description,
+                        "parameters": definition.parameters.model_dump(
+                            mode="json",
+                            exclude_none=True,
+                        ),
+                    },
+                }
+            )
+        return tools
 
 
 def build_default_registry() -> ToolRegistry:

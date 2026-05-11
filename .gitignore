@@ -1,5 +1,6 @@
 .venv/
 .env
 __pycache__/
+.sessions/
 # 本地数据库连接（含密码），勿提交
 src/tools/db/db.yaml
