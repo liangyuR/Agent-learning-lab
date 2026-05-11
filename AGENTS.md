@@ -7,7 +7,7 @@
 - **语言**: Python 3.12+
 - **LLM API**: DeepSeek OpenAI-compatible Chat Completions（通过 `httpx` 调用）
 - **依赖管理**: pip + requirements.txt
-- **环境变量**: python-dotenv，密钥存放于 `.env`（已 gitignore）
+- **环境变量**: python-dotenv，密钥存放于 `.env`
 
 ## 项目结构
 
@@ -16,7 +16,7 @@ src/
   main.py              # 入口 & 核心逻辑
   tests/               # 测试
 requirements.txt
-.env                   # DEEPSEEK_API_KEY（不入库）
+.env                   # DEEPSEEK_API_KEY
 ```
 
 ## 编码规范
@@ -32,7 +32,6 @@ requirements.txt
 - 每个新的 Agent 能力（tool use、multi-turn、RAG 等）作为独立模块放在 `src/` 下
 - Prompt 模板与业务逻辑分离，便于迭代和测试
 - 对外部 API 调用统一做异常处理和重试（使用 tenacity）
-- 新增功能必须附带 `src/tests/` 下的测试文件
 
 ## 运行方式
 
@@ -47,11 +46,11 @@ echo "DEEPSEEK_API_KEY=your-key" > .env
 python src/main.py
 ```
 
-## 学习路线参考
+## 详细文档
+- 设计文档 -> 'Docs/design-docs/'
+- 执行文档 -> 'Docs/exec-plans/'
 
-1. 基础 LLM 调用（当前阶段）
-2. Multi-turn 对话 & 上下文管理
-3. Tool Use / Function Calling
-4. RAG（检索增强生成）
-5. Multi-Agent 协作
-6. Agent 评估与可观测性
+## 使用规则
+- 只读取与当前任务相关的文档
+- 不要一次性加载所有内容
+- 信息冲突时，以更具体的文档为准
